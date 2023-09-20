@@ -23,6 +23,11 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.STRING,
         allowNull: false,
       },
+      role: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        defaultValue: 'user',
+      },
     },
     {
       initialAutoIncrement: 39100,

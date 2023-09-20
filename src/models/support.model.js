@@ -14,6 +14,11 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.TEXT('long'),
       allowNull: false,
     },
+    order: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
   });
   return Support;
 };

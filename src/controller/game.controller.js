@@ -11,10 +11,12 @@ const ParentGame = db.parentGame;
 const Package = db.package;
 const GameInput = db.gameInput;
 const GameInputOption = db.gameInputOption;
+const Comment = db.comment;
+const Order = db.order;
 
 class GameController {
   async createGame(req, res) {
-    const { name, fullName, preview, slug, shortDesc, iconValute, nameValute, textWarning, desc, instruction, advList, filterGameId, countryId, parentGameId, packages, isMomentDelivery } = req.body;
+    const { name, fullName, preview, slug, shortDesc, iconValute, nameValute, textWarning, desc, instruction, advList, filterGameId, countryId, parentGameId, packages, isMomentDelivery, whereImage } = req.body;
     const advListString = advList.join(',');
     let createData = {
       name,
@@ -31,18 +33,21 @@ class GameController {
       countryId,
       parentGameId,
       isMomentDelivery,
+      whereImage,
       advList: advListString,
       order: 0,
     };
 
     const createdGame = await Game.create(createData);
+    if (packages?.length !== 0) {
+      let createDataPackage = packages?.map((pack) => ({ gameId: createdGame.id, ...pack, id: undefined }));
+      await Package.bulkCreate(createDataPackage);
+    }
 
-    let createDataPackage = packages?.map((pack) => ({ gameId: createdGame.id, ...pack }));
-    await Package.bulkCreate(createDataPackage);
     res.json(true);
   }
   async updateSingleGame(req, res) {
-    const { id, name, fullName, preview, slug, shortDesc, iconValute, nameValute, textWarning, desc, instruction, advList, filterGameId, countryId, parentGameId, packages, isMomentDelivery } = req.body;
+    const { id, name, fullName, preview, slug, shortDesc, iconValute, nameValute, textWarning, desc, instruction, advList, filterGameId, countryId, parentGameId, packages, isMomentDelivery, whereImage } = req.body;
     const findGame = await Game.findOne({
       where: {
         id,
@@ -67,12 +72,14 @@ class GameController {
       countryId,
       parentGameId,
       isMomentDelivery,
+      whereImage,
       advList: advListString,
     };
 
     await Game.update(updateData, { where: { id } });
+    let packagesUpdate = packages?.map((pack) => ({ ...pack, id: pack?.packId }));
+    await Package.bulkCreate(packagesUpdate, { updateOnDuplicate: ['name', 'icon', 'price', 'discountPrice', 'disabled', 'deleted'] });
 
-    await Package.bulkCreate(packages, { updateOnDuplicate: ['name', 'icon', 'price', 'discountPrice', 'disabled', 'deleted'] });
     res.json(true);
   }
   async getGameSingle(req, res) {
@@ -92,6 +99,7 @@ class GameController {
           },
           attributes: ['id'],
         });
+        console.log(findParentBySlug);
         if (!findParentBySlug) {
           throw new CustomError(404, TypeError.NOT_FOUND);
         }
@@ -101,11 +109,20 @@ class GameController {
           [propName]: slug,
           ...(findParentBySlug && parentSlug && { parentGameId: findParentBySlug.id }),
         },
-        include: [{ model: Package }, { model: GameInput, include: { model: GameInputOption } }, { model: ParentGame, attributes: ['slug', 'name'] }],
+        include: [
+          { model: Package, where: { deleted: false }, order: [['order', 'DESC']], required: false },
+          { model: GameInput, include: { model: GameInputOption } },
+          { model: ParentGame, attributes: ['slug', 'name'] },
+          { model: Order, attributes: ['id'], include: [{ model: Comment, where: { moderate: true }, required: false, attributes: ['like'] }] },
+        ],
       });
+      const comments = findGame?.orders?.filter((com) => com.comment)?.map((com) => com.comment.like);
+      const rating = calcRating(comments?.filter((com) => !com)?.length, comments?.filter((com) => com)?.length);
+      const commentsCount = comments?.length;
+      console.log(findGame);
       if (findGame) {
         findGame.advList = findGame.advList.split(',');
-        res.json({ type: 'game', ...findGame.toJSON() });
+        res.json({ type: 'game', ...findGame.toJSON(), orders: undefined, commentsCount, rating });
       } else {
         let findParentGame = await ParentGame.findOne({
           where: {
@@ -113,6 +130,7 @@ class GameController {
           },
           include: Game,
         });
+
         if (findParentGame) {
           res.json({ type: 'parentGame', ...findParentGame.toJSON() });
         } else {
@@ -124,7 +142,7 @@ class GameController {
         where: {
           [propName]: slug,
         },
-        include: Package,
+        include: { model: Package, order: [['order', 'DESC']], where: { deleted: false }, required: false },
       });
       if (findGame) {
         findGame.advList = findGame.advList.split(',');
@@ -143,10 +161,20 @@ class GameController {
       allGameList = [...gameList, ...parentGameList].sort((a, b) => a.order - b.order);
       res.json(allGameList);
     } else {
-      const data = await Game.findAll();
+      const data = await Game.findAll({ order: [['order', 'DESC']] });
       res.json(data);
     }
   }
+}
+
+function calcRating(like, dislike) {
+  let stars = [like, 0, 0, 0, dislike],
+    count = 0,
+    sum = stars.reduce(function (sum, item, index) {
+      count += item;
+      return sum + item * (index + 1);
+    }, 0);
+  return sum / count;
 }
 
 module.exports = new GameController();

@@ -27,6 +27,15 @@ module.exports = (sequelize, Sequelize) => {
       defaultValue: false,
       allowNull: false,
     },
+    order: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    innerId: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
   });
   return Package;
 };

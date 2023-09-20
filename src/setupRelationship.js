@@ -29,9 +29,6 @@ const setupRelationship = (db) => {
   db.game.hasMany(db.gameInput);
   db.gameInput.belongsTo(db.game);
 
-  db.game.hasMany(db.gameInput);
-  db.gameInput.belongsTo(db.game);
-
   db.gameInput.hasMany(db.gameInputOption);
   db.gameInputOption.belongsTo(db.gameInput);
 
@@ -59,11 +56,17 @@ const setupRelationship = (db) => {
   db.gameInputOption.hasMany(db.orderGameInput);
   db.orderGameInput.belongsTo(db.gameInputOption);
 
-  db.game.hasMany(db.comment);
-  db.comment.belongsTo(db.game);
+  db.order.hasOne(db.comment);
+  db.comment.belongsTo(db.order);
 
   db.user.hasMany(db.comment);
   db.comment.belongsTo(db.user);
+
+  db.user.hasMany(db.transaction);
+  db.transaction.belongsTo(db.user);
+
+  db.comment.hasMany(db.transaction);
+  db.transaction.belongsTo(db.comment);
 };
 
 module.exports = setupRelationship;

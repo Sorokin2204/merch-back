@@ -9,5 +9,6 @@ const otherController = require('../controller/other.controller');
 router.get('/country/list', errorWrapper(otherController.getContryList));
 router.get('/filter-game/list', errorWrapper(otherController.getFilterGameList));
 router.get('/type-payment/list', errorWrapper(otherController.getTypePaymentList));
+router.get('/parser', errorWrapper(otherController.startParser));
 
 module.exports = router;

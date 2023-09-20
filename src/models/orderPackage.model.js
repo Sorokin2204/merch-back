@@ -4,6 +4,11 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.STRING,
       allowNull: false,
     },
+    totalPrice: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+    },
   });
   return OrderPackage;
 };

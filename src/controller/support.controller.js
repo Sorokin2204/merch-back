@@ -53,7 +53,7 @@ class SupportController {
     }
   }
   async getListSupport(req, res) {
-    const data = await Support.findAll();
+    const data = await Support.findAll({ order: [['order', 'DESC']] });
     res.json(data);
   }
 }

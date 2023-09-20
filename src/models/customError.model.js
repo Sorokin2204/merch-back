@@ -8,6 +8,7 @@ const TypeError = {
   USER_EXIST: 'USER_EXIST',
   LOGIN_ERROR: 'LOGIN_ERROR',
   NOT_FOUND: 'NOT_FOUND',
+  COMMENT_EXIST: 'COMMENT_EXIST',
 };
 
 class CustomError {

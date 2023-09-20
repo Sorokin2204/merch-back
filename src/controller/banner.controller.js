@@ -83,6 +83,7 @@ class BannerController {
   }
   async getListBanner(req, res) {
     const data = await Banner.findAll({
+      order: [['order', 'DESC']],
       include: [
         { model: Game, attributes: ['slug'] },
         { model: ParentGame, attributes: ['slug'] },

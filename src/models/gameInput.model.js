@@ -20,6 +20,16 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.TEXT('long'),
       allowNull: true,
     },
+    mainInput: {
+      type: Sequelize.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    order: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
   });
   return GameInput;
 };

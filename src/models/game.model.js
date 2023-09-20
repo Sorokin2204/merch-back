@@ -52,6 +52,11 @@ module.exports = (sequelize, Sequelize) => {
     order: {
       type: Sequelize.INTEGER,
       allowNull: false,
+      defaultValue: 0,
+    },
+    whereImage: {
+      type: Sequelize.STRING,
+      allowNull: true,
     },
   });
   return Game;
