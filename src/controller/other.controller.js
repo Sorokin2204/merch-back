@@ -66,6 +66,12 @@ class OtherController {
     }
     res.json({ success: true });
   }
+
+  async paymentFirst(req, res) {
+    console.log(req?.body);
+
+    res.json('OK');
+  }
 }
 
 async function uploadImage(url) {
