@@ -12,6 +12,10 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.FLOAT,
       allowNull: false,
     },
+    innerId: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+    },
     order: {
       type: Sequelize.INTEGER,
       allowNull: false,

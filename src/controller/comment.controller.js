@@ -24,7 +24,6 @@ class CommentController {
       },
       include: [{ model: Comment, include: Transaction }],
     });
-    console.log(findOrderUser);
     if (!findOrderUser || findOrderUser?.comment) {
       throw new CustomError(400, TypeError.COMMENT_EXIST);
     }
@@ -44,7 +43,6 @@ class CommentController {
   }
   async updateComment(req, res) {
     const { commentId, answer, moderate } = req.body;
-    console.log(moderate);
     await Comment.update(
       {
         answer,

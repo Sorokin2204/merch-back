@@ -8,6 +8,7 @@ const authAdmin = require('../middleware/authAdmin');
 
 router.post('/create', errorWrapper(auth), errorWrapper(orderController.createOrder));
 router.post('/create-payment', errorWrapper(auth), errorWrapper(orderController.createPayment));
+router.post('/create-topup', errorWrapper(auth), errorWrapper(orderController.createTopup));
 router.post('/process-payment', errorWrapper(orderController.processPaymentText));
 router.post('/update', errorWrapper(authAdmin), errorWrapper(orderController.updateOrder));
 router.get('/list', errorWrapper(auth), errorWrapper(orderController.getOrderList));

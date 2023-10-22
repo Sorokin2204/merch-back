@@ -5,6 +5,7 @@ const { CustomError, TypeError } = require('../models/customError.model');
 const moment = require('moment/moment');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { currencyFormat } = require('../utils/currencyFormat');
 const { packageParser } = require('../utils/packageParser');
 const { default: axios } = require('axios');
@@ -18,6 +19,8 @@ const TypePayment = db.typePayment;
 const Game = db.game;
 const ParentGame = db.parentGame;
 const Package = db.package;
+const User = db.user;
+const Transaction = db.transaction;
 
 class OtherController {
   async getFilterGameList(req, res) {
@@ -68,9 +71,56 @@ class OtherController {
   }
 
   async paymentFirst(req, res) {
-    console.log(req?.body);
+    const body = req.body;
+    console.log(body);
+    const hashData = `${body.MERCHANT_ID}:${body.AMOUNT}:)8$6Fc33v}pRfQ*:${body.MERCHANT_ORDER_ID}`;
+    const hash = crypto.createHash('md5').update(hashData).digest('hex');
+    if (hash == body.SIGN) {
+      if (body.MERCHANT_ORDER_ID) {
+        const findOrderSingle = await Order.findOne({
+          where: { id: body.MERCHANT_ORDER_ID },
+          include: [{ model: OrderPackage, include: Package }],
+        });
+        if (!findOrderSingle) {
+          throw new CustomError(400);
+        }
+        await Order.update(
+          { status: 'paid', saveGameInputs: true },
+          {
+            where: {
+              id: body.MERCHANT_ORDER_ID,
+            },
+          },
+        );
+        for (let orderPack of findOrderSingle?.orderPackages) {
+          await OrderPackage.update(
+            { status: 'paid', totalPrice: orderPack.package.price },
+            {
+              where: {
+                id: orderPack.id,
+              },
+            },
+          );
+        }
+      } else {
+        const findUser = await User.findOne({ where: { email: body.P_EMAIL } });
+        if (!findUser) {
+          throw new CustomError(400);
+        }
+        const updateBalance = parseInt(findUser.balance) + parseInt(body.AMOUNT);
+        await User.update(
+          {
+            balance: updateBalance,
+          },
+          { where: { id: findUser.id } },
+        );
+        await Transaction.create({ type: 2, sum: body.AMOUNT, userId: findUser?.id });
+      }
 
-    res.json('OK');
+      res.json('YES');
+    } else {
+      throw new CustomError(400);
+    }
   }
 }
 

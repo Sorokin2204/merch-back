@@ -9,6 +9,8 @@ const generator = require('generate-password');
 const mailService = require('../services/mail-service');
 const { currencyFormat } = require('../utils/currencyFormat');
 const randomIntFromInterval = require('../utils/randomIntFromInterval');
+const { default: axios } = require('axios');
+const crypto = require('crypto');
 const Order = db.order;
 const Game = db.game;
 const GameInput = db.gameInput;
@@ -42,15 +44,11 @@ class OrderController {
     res.json({ orderId: createOrder.id });
   }
   async createPayment(req, res) {
-    const { orderId } = req.body;
-
-    const tokenHeader = req.headers['auth-token'];
-    const tokenData = jwt.verify(tokenHeader, process.env.SECRET_TOKEN, (err, tokenData) => {
-      if (err) {
-        throw new CustomError(400);
-      }
-      return tokenData;
-    });
+    const { orderId, typePaymentId } = req.body;
+    const findTypePayment = await TypePayment.findOne({ where: { id: typePaymentId } });
+    if (!findTypePayment) {
+      throw new CustomError(400);
+    }
     const findOrderSingle = await Order.findOne({
       where: { userId: res.locals.userData.id, id: orderId },
       include: [{ model: OrderPackage, include: Package }],
@@ -60,16 +58,20 @@ class OrderController {
       .reduce((accumulator, currentValue) => {
         return accumulator + currentValue;
       }, 0);
-    console.log({ amount: totalAmount, orderId, userId: tokenData?.id });
-    res.json(true);
-    // try {
-    //   const url = await createPaymentUrl({amount: totalAmount, orderId, userId: tokenData?.id });
-    //   res.json({ url });
-    // } catch (error) {
-    //   throw new CustomError(400);
-    // }
-  }
+    const paymentUrl = await getPaymentUrl({ amount: totalAmount, email: res.locals.userData.email, paymentId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
 
+    res.json({ url: paymentUrl });
+  }
+  async createTopup(req, res) {
+    const { typePaymentId, amount } = req.body;
+    const findTypePayment = await TypePayment.findOne({ where: { id: typePaymentId } });
+    if (!findTypePayment) {
+      throw new CustomError(400);
+    }
+
+    const paymentUrl = await getPaymentUrl({ amount, email: res.locals.userData.email, typePayment: findTypePayment?.innerId });
+    res.json({ url: paymentUrl });
+  }
   async getSaveGameInputs(req, res) {
     const { gameId } = req.query;
     const findOrderWithSaveGameInputs = await Game.findAll({
@@ -82,34 +84,52 @@ class OrderController {
   }
 
   async processPaymentText(req, res) {
-    const { orderId, userId } = req.body;
-    const findOrderSingle = await Order.findOne({
-      where: { userId, id: orderId },
-      include: [{ model: OrderPackage, include: Package }],
-    });
-    if (!findOrderSingle) {
-      throw new CustomError(400);
-    }
-    await Order.update(
-      { status: 'paid', saveGameInputs: true },
-      {
-        where: {
-          id: orderId,
-          userId,
-        },
-      },
-    );
-    for (let orderPack of findOrderSingle?.orderPackages) {
-      await OrderPackage.update(
-        { status: 'paid', totalPrice: orderPack.package.price },
+    const body = {
+      MERCHANT_ID: '41111',
+      AMOUNT: '100',
+      intid: '108339384',
+      MERCHANT_ORDER_ID: '',
+      P_EMAIL: 'danila220096@gmail.com',
+      P_PHONE: '',
+      CUR_ID: '36',
+      payer_account: '220024******3159',
+      commission: '0',
+      SIGN: '5c3bf3a5122dcc21d7a1461c88fcf04e',
+    };
+    const hashData = `${body.MERCHANT_ID}:${body.AMOUNT}:)8$6Fc33v}pRfQ*:${body.MERCHANT_ORDER_ID}`;
+    const hash = crypto.createHash('md5').update(hashData).digest('hex');
+    console.log(hash);
+    if (hash == body.SIGN) {
+      const findOrderSingle = await Order.findOne({
+        where: { id: body.MERCHANT_ORDER_ID },
+        include: [{ model: OrderPackage, include: Package }],
+      });
+      if (!findOrderSingle) {
+        throw new CustomError(400);
+      }
+      await Order.update(
+        { status: 'paid', saveGameInputs: true },
         {
           where: {
-            id: orderPack.id,
+            id: body.MERCHANT_ORDER_ID,
           },
         },
       );
+      for (let orderPack of findOrderSingle?.orderPackages) {
+        await OrderPackage.update(
+          { status: 'paid', totalPrice: orderPack.package.price },
+          {
+            where: {
+              id: orderPack.id,
+            },
+          },
+        );
+      }
+
+      res.json('YES');
+    } else {
+      throw new CustomError(400);
     }
-    res.json({ success: true });
   }
   async processPayment(req, res) {
     let test = crypto
@@ -247,5 +267,31 @@ class OrderController {
     res.json({ success: true });
   }
 }
+const getPaymentUrl = async ({ typePayment, amount, email, paymentId = null }) => {
+  let postData = {
+    shopId: 41111,
+    nonce: new Date().getTime(),
+    i: typePayment,
+    amount,
+    currency: 'RUB',
+    ip: '37.214.70.101',
+    email,
+    ...(paymentId && { paymentId }),
+  };
+  let postDataSort = Object.keys(postData)
+    .sort()
+    .reduce((obj, key) => {
+      obj[key] = postData[key];
+      return obj;
+    }, {});
 
+  let signature = Object.keys(postDataSort)
+    .map((key) => postDataSort[key])
+    .join('|');
+  let signatureSha = crypto.createHmac('sha256', 'a525f3ed29f2b5f71ce31efff199a5e2').update(signature).digest('hex');
+  postData['signature'] = signatureSha;
+  const paymentResponse = await axios.post('https://api.freekassa.ru/v1/orders/create', postData);
+  console.log(paymentResponse.data);
+  return paymentResponse.data?.location;
+};
 module.exports = new OrderController();

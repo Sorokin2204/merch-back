@@ -119,7 +119,6 @@ class GameController {
       const comments = findGame?.orders?.filter((com) => com.comment)?.map((com) => com.comment.like);
       const rating = calcRating(comments?.filter((com) => !com)?.length, comments?.filter((com) => com)?.length);
       const commentsCount = comments?.length;
-      console.log(findGame);
       if (findGame) {
         findGame.advList = findGame.advList.split(',');
         res.json({ type: 'game', ...findGame.toJSON(), orders: undefined, commentsCount, rating });
