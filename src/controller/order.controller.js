@@ -84,18 +84,19 @@ class OrderController {
   }
 
   async processPaymentText(req, res) {
-    const body = {
-      MERCHANT_ID: '41111',
-      AMOUNT: '100',
-      intid: '108339384',
-      MERCHANT_ORDER_ID: '',
-      P_EMAIL: 'danila220096@gmail.com',
-      P_PHONE: '',
-      CUR_ID: '36',
-      payer_account: '220024******3159',
-      commission: '0',
-      SIGN: '5c3bf3a5122dcc21d7a1461c88fcf04e',
-    };
+    const body = req.body;
+    // const body = {
+    //   MERCHANT_ID: '41111',
+    //   AMOUNT: '100',
+    //   intid: '108339384',
+    //   MERCHANT_ORDER_ID: '',
+    //   P_EMAIL: 'danila220096@gmail.com',
+    //   P_PHONE: '',
+    //   CUR_ID: '36',
+    //   payer_account: '220024******3159',
+    //   commission: '0',
+    //   SIGN: '5c3bf3a5122dcc21d7a1461c88fcf04e',
+    // };
     const hashData = `${body.MERCHANT_ID}:${body.AMOUNT}:)8$6Fc33v}pRfQ*:${body.MERCHANT_ORDER_ID}`;
     const hash = crypto.createHash('md5').update(hashData).digest('hex');
     console.log(hash);

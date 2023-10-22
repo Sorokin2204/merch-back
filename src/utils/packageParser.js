@@ -47,8 +47,9 @@ async function packageParser(url) {
     let browser;
     try {
       browser = await puppeteer.launch({
-        headless: false,
+        headless: true,
         args: minimal_args,
+        executablePath: '/usr/bin/chromium-browser',
         defaultViewport: {
           width: 1920,
           height: 1080,

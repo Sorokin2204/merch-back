@@ -119,12 +119,11 @@ class PageController {
     }
 
     const tokenPassword = jwt.sign({ id: userId, email: userEmail }, process.env.SECRET_TOKEN_PASSWORD, { expiresIn: '1d' });
-    await mailService.sendMailPassword(email, `http://localhost:3000/do?e=${email}&s=${tokenPassword}`);
-    // console.log('Отправка password token на почту', `http://localhost:3000/do?e=${email}&s=${tokenPassword}`);
+    await mailService.sendMailPassword(email, `${process.env.DOMAIN}/do?e=${email}&s=${tokenPassword}`);
     const tokenOrder = jwt.sign({ id: userId, email: userEmail }, process.env.SECRET_TOKEN, { expiresIn: '1m' });
     if (order) {
       try {
-        await axios.post(`http://localhost:8080/api/order/create`, order, { headers: { 'auth-token': tokenOrder } });
+        await axios.post(`${process.env.DOMAIN}/api/order/create`, order, { headers: { 'auth-token': tokenOrder } });
       } catch (error) {
         console.log(error);
         throw new CustomError();
