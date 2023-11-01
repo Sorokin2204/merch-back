@@ -16,6 +16,7 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.INTEGER,
       allowNull: false,
     },
+    variantPayment: { type: Sequelize.INTEGER, allowNull: false },
     order: {
       type: Sequelize.INTEGER,
       allowNull: false,

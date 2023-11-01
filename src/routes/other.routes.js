@@ -11,5 +11,6 @@ router.get('/filter-game/list', errorWrapper(otherController.getFilterGameList))
 router.get('/type-payment/list', errorWrapper(otherController.getTypePaymentList));
 router.get('/parser', errorWrapper(otherController.startParser));
 router.post('/payment-1', errorWrapper(otherController.paymentFirst));
+router.post('/payment-2', errorWrapper(otherController.paymentSecond));
 
 module.exports = router;

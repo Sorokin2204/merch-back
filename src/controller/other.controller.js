@@ -21,6 +21,8 @@ const ParentGame = db.parentGame;
 const Package = db.package;
 const User = db.user;
 const Transaction = db.transaction;
+const Order = db.order;
+const OrderPackage = db.orderPackage;
 
 class OtherController {
   async getFilterGameList(req, res) {
@@ -121,6 +123,12 @@ class OtherController {
     } else {
       throw new CustomError(400);
     }
+  }
+
+  async paymentSecond(req, res) {
+    console.log(req.headers);
+    console.log(req.body);
+    res.json(true);
   }
 }
 

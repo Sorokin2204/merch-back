@@ -24,12 +24,12 @@ const Comment = db.comment;
 
 class OrderController {
   async createOrder(req, res) {
-    const { gameId, typePaymentId, packageList, gameInputList } = req.body;
+    const { gameId, typePaymentId = null, packageList, gameInputList } = req.body;
     const orderData = {
       status: 'wait',
       userId: res.locals.userData.id,
       gameId,
-      typePaymentId,
+      ...(typePaymentId && { typePaymentId }),
     };
     const createOrder = await Order.create(orderData);
 
@@ -58,10 +58,16 @@ class OrderController {
       .reduce((accumulator, currentValue) => {
         return accumulator + currentValue;
       }, 0);
-    const paymentUrl = await getPaymentUrl({ amount: totalAmount, email: res.locals.userData.email, paymentId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
+    let paymentUrl;
+    if (findTypePayment?.variantPayment == 1) {
+      paymentUrl = await getPaymentUrl({ amount: totalAmount, email: res.locals.userData.email, paymentId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
+    } else {
+      paymentUrl = await getPaymentUrlLava({ amount: totalAmount, userId: res.locals.userData.id, orderId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
+    }
 
     res.json({ url: paymentUrl });
   }
+
   async createTopup(req, res) {
     const { typePaymentId, amount } = req.body;
     const findTypePayment = await TypePayment.findOne({ where: { id: typePaymentId } });
@@ -83,113 +89,6 @@ class OrderController {
     res.json(findOrderWithSaveGameInputs);
   }
 
-  async processPaymentText(req, res) {
-    const body = req.body;
-    // const body = {
-    //   MERCHANT_ID: '41111',
-    //   AMOUNT: '100',
-    //   intid: '108339384',
-    //   MERCHANT_ORDER_ID: '',
-    //   P_EMAIL: 'danila220096@gmail.com',
-    //   P_PHONE: '',
-    //   CUR_ID: '36',
-    //   payer_account: '220024******3159',
-    //   commission: '0',
-    //   SIGN: '5c3bf3a5122dcc21d7a1461c88fcf04e',
-    // };
-    const hashData = `${body.MERCHANT_ID}:${body.AMOUNT}:)8$6Fc33v}pRfQ*:${body.MERCHANT_ORDER_ID}`;
-    const hash = crypto.createHash('md5').update(hashData).digest('hex');
-    console.log(hash);
-    if (hash == body.SIGN) {
-      const findOrderSingle = await Order.findOne({
-        where: { id: body.MERCHANT_ORDER_ID },
-        include: [{ model: OrderPackage, include: Package }],
-      });
-      if (!findOrderSingle) {
-        throw new CustomError(400);
-      }
-      await Order.update(
-        { status: 'paid', saveGameInputs: true },
-        {
-          where: {
-            id: body.MERCHANT_ORDER_ID,
-          },
-        },
-      );
-      for (let orderPack of findOrderSingle?.orderPackages) {
-        await OrderPackage.update(
-          { status: 'paid', totalPrice: orderPack.package.price },
-          {
-            where: {
-              id: orderPack.id,
-            },
-          },
-        );
-      }
-
-      res.json('YES');
-    } else {
-      throw new CustomError(400);
-    }
-  }
-  async processPayment(req, res) {
-    let test = crypto
-      .createHmac('sha256', 'd58604dba974bf7dd3eca910eb3b74cc0b831b3f')
-      .update(
-        JSON.stringify(
-          Object.keys(req.body)
-            .sort()
-            .reduce((obj, key) => {
-              obj[key] = req.body[key];
-              return obj;
-            }, {}),
-        ),
-      )
-      .digest('hex');
-
-    if (test == req.headers['x-api-sha256-signature']) {
-      const { status, custom_fields, amount } = req.body;
-      let customField = custom_fields;
-      let userId = customField.userId;
-      let orderId = customField.orderId;
-      if (!req.headers['x-api-sha256-signature'] || req.headers['user-agent'] !== 'enot/1.0') {
-        throw new CustomError(400);
-      }
-      if (status === 'success') {
-        const findOrderSingle = await Order.findOne({
-          where: { userId, id: orderId },
-          include: [{ model: OrderPackage, include: Package }],
-        });
-
-        await Order.update(
-          { status: 'paid' },
-          {
-            where: {
-              id: orderId,
-            },
-          },
-        );
-        for (let orderPack of findOrderSingle?.orderPackages) {
-          await OrderPackage.update(
-            { status: 'paid', total: orderPack.package.price },
-            {
-              where: {
-                id: orderPack.id,
-              },
-            },
-          );
-        }
-
-        res.send('OK');
-      } else {
-        console.error('NOT SUCCESS PAYMENT');
-        console.error(req.body);
-        throw new CustomError(400);
-      }
-    } else {
-      throw new CustomError(400);
-    }
-  }
   async getOrderSingle(req, res) {
     const { id } = req.params;
 
@@ -294,5 +193,36 @@ const getPaymentUrl = async ({ typePayment, amount, email, paymentId = null }) =
   const paymentResponse = await axios.post('https://api.freekassa.ru/v1/orders/create', postData);
   console.log(paymentResponse.data);
   return paymentResponse.data?.location;
+};
+
+const getPaymentUrlLava = async ({ typePayment, amount, userId, orderId }) => {
+  let includeServiceSingle;
+  if (typePayment == '1') {
+    includeServiceSingle = 'card';
+  } else if (typePayment == '2') {
+    includeServiceSingle = 'qiwi';
+  } else if (typePayment == '3') {
+    includeServiceSingle = 'sbp';
+  }
+  const body = {
+    includeService: [includeServiceSingle],
+    orderId: uuidv4(),
+    shopId: '52f35990-cf15-49e0-8a8a-202c0f247b81',
+    sum: amount,
+    customFields: userId ? `userId=${userId}` : `orderId=${orderId}`,
+  };
+  const secretKey = '3550a9c781c00b6bbd444f1591a7e74d36aa1dfc';
+  const signature = crypto.createHmac('sha256', secretKey).update(JSON.stringify(body)).digest('hex');
+
+  const response = await axios.post('https://api.lava.ru/business/invoice/create', body, {
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Signature: signature,
+    },
+  });
+
+  console.log(response.data);
+  return response.data?.data?.url;
 };
 module.exports = new OrderController();
