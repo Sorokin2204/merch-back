@@ -79,44 +79,9 @@ class OtherController {
     const hash = crypto.createHash('md5').update(hashData).digest('hex');
     if (hash == body.SIGN) {
       if (body.MERCHANT_ORDER_ID) {
-        const findOrderSingle = await Order.findOne({
-          where: { id: body.MERCHANT_ORDER_ID },
-          include: [{ model: OrderPackage, include: Package }],
-        });
-        if (!findOrderSingle) {
-          throw new CustomError(400);
-        }
-        await Order.update(
-          { status: 'paid', saveGameInputs: true },
-          {
-            where: {
-              id: body.MERCHANT_ORDER_ID,
-            },
-          },
-        );
-        for (let orderPack of findOrderSingle?.orderPackages) {
-          await OrderPackage.update(
-            { status: 'paid', totalPrice: orderPack.package.price },
-            {
-              where: {
-                id: orderPack.id,
-              },
-            },
-          );
-        }
+        await paymentOrderUser({ orderId: body.MERCHANT_ORDER_ID });
       } else {
-        const findUser = await User.findOne({ where: { email: body.P_EMAIL } });
-        if (!findUser) {
-          throw new CustomError(400);
-        }
-        const updateBalance = parseInt(findUser.balance) + parseInt(body.AMOUNT);
-        await User.update(
-          {
-            balance: updateBalance,
-          },
-          { where: { id: findUser.id } },
-        );
-        await Transaction.create({ type: 2, sum: body.AMOUNT, userId: findUser?.id });
+        await topUpBalanceUser({ email: body.P_EMAIL, amount: body.AMOUNT });
       }
 
       res.json('YES');
@@ -126,9 +91,81 @@ class OtherController {
   }
 
   async paymentSecond(req, res) {
-    console.log(req.headers);
+    const secretKey = 'cb07e454e08ddf1f9033e1668de9d0e3e2b74032';
+
+    let postDataSort = Object.keys(req.body)
+      .sort()
+      .reduce((obj, key) => {
+        obj[key] = req.body[key];
+        return obj;
+      }, {});
     console.log(req.body);
-    res.json(true);
+    const signature = crypto.createHmac('sha256', secretKey).update(JSON.stringify(postDataSort)).digest('hex');
+
+    if (signature == req.headers['authorization']) {
+      const customFields = req.body.custom_fields.split('=');
+
+      if (customFields[0] == 'userId') {
+        await topUpBalanceUser({ userId: customFields[1], amount: body.amount });
+        res.json('OK');
+      } else if (customFields[0] == 'orderId') {
+        await paymentOrderUser({ orderId: customFields[1] });
+        res.json('OK');
+      } else {
+        throw new CustomError(400);
+      }
+    }
+  }
+}
+
+async function topUpBalanceUser({ email, userId, amount }) {
+  let condUser;
+
+  if (email) {
+    condUser = { email };
+  } else {
+    condUser = { id: userId };
+  }
+
+  const findUser = await User.findOne({ where: condUser });
+  if (!findUser) {
+    throw new CustomError(400);
+  }
+  const updateBalance = parseInt(findUser.balance) + parseInt(amount);
+  await User.update(
+    {
+      balance: updateBalance,
+    },
+    { where: { id: findUser.id } },
+  );
+  await Transaction.create({ type: 2, sum: amount, userId: findUser?.id });
+}
+
+async function paymentOrderUser({ orderId }) {
+  const findOrderSingle = await Order.findOne({
+    where: { id: orderId },
+    include: [{ model: OrderPackage, include: Package }],
+  });
+  if (!findOrderSingle) {
+    throw new CustomError(400);
+  }
+  await Order.update(
+    { status: 'paid', saveGameInputs: true },
+    {
+      where: {
+        id: orderId,
+      },
+    },
+  );
+  for (let orderPack of findOrderSingle?.orderPackages) {
+    await OrderPackage.update(
+      { status: 'paid', totalPrice: orderPack.package.price },
+      {
+        where: {
+          id: orderPack.id,
+        },
+      },
+    );
   }
 }
 

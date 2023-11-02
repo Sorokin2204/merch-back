@@ -45,27 +45,74 @@ class OrderController {
   }
   async createPayment(req, res) {
     const { orderId, typePaymentId } = req.body;
-    const findTypePayment = await TypePayment.findOne({ where: { id: typePaymentId } });
-    if (!findTypePayment) {
-      throw new CustomError(400);
-    }
     const findOrderSingle = await Order.findOne({
       where: { userId: res.locals.userData.id, id: orderId },
       include: [{ model: OrderPackage, include: Package }],
     });
-    const totalAmount = findOrderSingle?.orderPackages
-      ?.map((itemPack) => itemPack?.package.price)
-      .reduce((accumulator, currentValue) => {
-        return accumulator + currentValue;
-      }, 0);
-    let paymentUrl;
-    if (findTypePayment?.variantPayment == 1) {
-      paymentUrl = await getPaymentUrl({ amount: totalAmount, email: res.locals.userData.email, paymentId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
-    } else {
-      paymentUrl = await getPaymentUrlLava({ amount: totalAmount, userId: res.locals.userData.id, orderId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
+    if (!findOrderSingle) {
+      throw new CustomError(400);
     }
+    const totalAmount = parseInt(
+      findOrderSingle?.orderPackages
+        ?.map((itemPack) => itemPack?.package.price)
+        .reduce((accumulator, currentValue) => {
+          return accumulator + currentValue;
+        }, 0),
+    );
+    if (typePaymentId == null) {
+      if (res.locals.userData.balance >= totalAmount) {
+        const result = await db.sequelize.transaction(async (t) => {
+          const updateBalance = parseInt(res.locals.userData.balance) - parseInt(totalAmount);
+          await User.update(
+            {
+              balance: updateBalance,
+            },
+            {
+              transaction: t,
+              where: { id: res.locals.userData.id },
+            },
+          );
+          await Order.update(
+            { status: 'paid', saveGameInputs: true },
+            {
+              transaction: t,
+              where: {
+                id: orderId,
+              },
+            },
+          );
+          for (let orderPack of findOrderSingle?.orderPackages) {
+            await OrderPackage.update(
+              { status: 'paid', totalPrice: orderPack.package.price },
+              {
+                transaction: t,
+                where: {
+                  id: orderPack.id,
+                },
+              },
+            );
+          }
+        });
 
-    res.json({ url: paymentUrl });
+        res.json({ success: true, type: 'balance' });
+      } else {
+        throw new CustomError(400);
+      }
+    } else {
+      const findTypePayment = await TypePayment.findOne({ where: { id: typePaymentId } });
+      if (!findTypePayment) {
+        throw new CustomError(400);
+      }
+
+      let paymentUrl;
+      if (findTypePayment?.variantPayment == 1) {
+        paymentUrl = await getPaymentUrl({ amount: totalAmount, email: res.locals.userData.email, paymentId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
+      } else {
+        paymentUrl = await getPaymentUrlLava({ amount: totalAmount, orderId: findOrderSingle?.id, typePayment: findTypePayment?.innerId });
+      }
+
+      res.json({ type: 'card', success: true, url: paymentUrl });
+    }
   }
 
   async createTopup(req, res) {
@@ -74,8 +121,13 @@ class OrderController {
     if (!findTypePayment) {
       throw new CustomError(400);
     }
+    let paymentUrl;
+    if (findTypePayment?.variantPayment == 1) {
+      paymentUrl = await getPaymentUrl({ amount, email: res.locals.userData.email, typePayment: findTypePayment?.innerId });
+    } else {
+      paymentUrl = await getPaymentUrlLava({ amount: amount, userId: res.locals.userData.id, typePayment: findTypePayment?.innerId });
+    }
 
-    const paymentUrl = await getPaymentUrl({ amount, email: res.locals.userData.email, typePayment: findTypePayment?.innerId });
     res.json({ url: paymentUrl });
   }
   async getSaveGameInputs(req, res) {
@@ -139,7 +191,7 @@ class OrderController {
     res.json(findOrderList);
   }
   async changeTypePaymentOrder(req, res) {
-    const { orderId, typePaymentId } = req.body;
+    const { orderId, typePaymentId = null } = req.body;
 
     await Order.update(
       { typePaymentId },
