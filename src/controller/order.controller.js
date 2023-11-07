@@ -18,9 +18,11 @@ const User = db.user;
 const Package = db.package;
 const OrderPackage = db.orderPackage;
 const OrderGameInput = db.orderGameInput;
+const OrderGameInputRelation = db.orderGameInputRelation;
 const GameInputOption = db.gameInputOption;
 const TypePayment = db.typePayment;
 const Comment = db.comment;
+const ParentGame = db.parentGame;
 
 class OrderController {
   async createOrder(req, res) {
@@ -38,11 +40,36 @@ class OrderController {
     await OrderPackage.bulkCreate(orderPackageData);
 
     if (gameInputList?.length !== 0) {
-      const orderGameInputData = gameInputList?.map((gameInput) => ({ gameInputId: gameInput.gameInputId, ...(gameInput?.type == 'select' ? { gameInputOptionId: gameInput.value, value: null } : { value: gameInput.value }), orderId: createOrder?.id }));
-      await OrderGameInput.bulkCreate(orderGameInputData);
+      let orderGameInputData = gameInputList?.map((gameInput) => ({ gameInputId: gameInput.gameInputId, ...(gameInput?.type == 'select' ? { gameInputOptionId: gameInput.value, value: null } : { value: gameInput.value }) }));
+      console.log(orderGameInputData);
+      let existGameInputs = await findExistGameInputs({ orderGameInputData, userId: res.locals.userData.id, gameId });
+      console.log(existGameInputs);
+      if (existGameInputs) {
+        existGameInputs = existGameInputs?.map((existGameInputId) => ({ orderGameInputId: existGameInputId, orderId: createOrder?.id }));
+        console.log(existGameInputs);
+        await OrderGameInputRelation.bulkCreate(existGameInputs);
+      } else {
+        for (let orderGameInput of orderGameInputData) {
+          const createOrderGameInput = await OrderGameInput.create(orderGameInput);
+          await OrderGameInputRelation.create({ orderGameInputId: createOrderGameInput.id, orderId: createOrder?.id });
+        }
+      }
     }
     res.json({ orderId: createOrder.id });
   }
+
+  // async test(req, res) {
+  //   let data = await findExistGameInputs({
+  //     userId: 1,
+  //     gameId: 11,
+  //     orderGameInputData: [
+  //       { gameInputId: 2, gameInputOptionId: '1', value: null },
+  //       { gameInputId: 1, value: '34534543534' },
+  //     ],
+  //   });
+  //   res.json(data);
+  // }
+
   async createPayment(req, res) {
     const { orderId, typePaymentId } = req.body;
     const findOrderSingle = await Order.findOne({
@@ -132,10 +159,46 @@ class OrderController {
   }
   async getSaveGameInputs(req, res) {
     const { gameId } = req.query;
-    const findOrderWithSaveGameInputs = await Game.findAll({
+    let findOrderWithSaveGameInputs = await Game.findAll({
       ...(gameId && { where: { id: gameId } }),
-      include: { model: Order, where: { userId: res.locals.userData.id, saveGameInputs: true, status: { [Op.not]: 'wait' } }, include: [{ model: OrderGameInput, include: [{ model: GameInput }, { model: GameInputOption }] }], attributes: ['id'] },
+
+      include: [
+        {
+          model: Order,
+          where: { userId: res.locals.userData.id, saveGameInputs: true, status: { [Op.not]: 'wait' } },
+          include: [{ model: OrderGameInput, include: [{ model: GameInput }, { model: GameInputOption }] }],
+          attributes: ['id'],
+        },
+        { model: ParentGame, attributes: ['id', 'slug'] },
+      ],
       attributes: ['name', 'slug', 'preview'],
+      // include: [{ model: ParentGame, attributes: ['id', 'slug'] }],
+    });
+
+    findOrderWithSaveGameInputs = findOrderWithSaveGameInputs.map((el) => el.get({ plain: true }));
+    findOrderWithSaveGameInputs = findOrderWithSaveGameInputs?.map((game) => {
+      let ordersSort = game?.orders?.map((orderWithSaveGameInputs) => {
+        if (orderWithSaveGameInputs.orderGameInputs?.length !== 0) {
+          let sortGameInputs = [...orderWithSaveGameInputs?.orderGameInputs].sort((a, b) => a.gameInput?.order - b.gameInput?.order);
+
+          return { ...orderWithSaveGameInputs, orderGameInputs: sortGameInputs };
+        } else {
+          return orderWithSaveGameInputs;
+        }
+      });
+      ordersSort = ordersSort?.filter((order, index) => {
+        const gameInputIds = order?.orderGameInputs?.map((orderGameInput) => orderGameInput?.id)?.join(',');
+        return (
+          ordersSort?.findIndex((item) => {
+            const gameInputIdsItem = item?.orderGameInputs?.map((orderGameInput) => orderGameInput?.id)?.join(',');
+            return gameInputIds == gameInputIdsItem;
+          }) == index
+        );
+      });
+      return {
+        ...game,
+        orders: ordersSort,
+      };
     });
 
     res.json(findOrderWithSaveGameInputs);
@@ -185,7 +248,7 @@ class OrderController {
   async getOrderListAdmin(req, res) {
     const findOrderList = await Order.findAll({
       order: [['createdAt', 'DESC']],
-      where: { status: { [Op.or]: ['success', 'paid'] } },
+      where: { status: { [Op.or]: ['success', 'paid', 'incorrect', 'not-available'] } },
       include: [{ model: Game, attribute: ['preview', 'name'] }, { model: OrderPackage, include: Package }, { model: OrderGameInput, include: [{ model: GameInput }, { model: GameInputOption }] }, { model: TypePayment }, { model: User }],
     });
     res.json(findOrderList);
@@ -245,6 +308,53 @@ const getPaymentUrl = async ({ typePayment, amount, email, paymentId = null }) =
   const paymentResponse = await axios.post('https://api.freekassa.ru/v1/orders/create', postData);
   console.log(paymentResponse.data);
   return paymentResponse.data?.location;
+};
+
+const findExistGameInputs = async ({ gameId, userId, orderGameInputData }) => {
+  let result;
+
+  const findAllOrderGameInputs = await Game.findOne({
+    where: { id: gameId },
+    include: [
+      {
+        model: Order,
+        where: { userId: userId },
+        include: [
+          {
+            model: OrderGameInput,
+            where: {
+              [Op.or]: orderGameInputData,
+            },
+          },
+        ],
+        attributes: ['id'],
+      },
+    ],
+    attributes: ['id'],
+  });
+  for (let order of findAllOrderGameInputs.orders) {
+    if (order?.orderGameInputs?.length == orderGameInputData?.length) {
+      // result = orderGameInputData?.map(
+      //   (itemGameInput) =>
+      //     order?.orderGameInputs?.find((gameInput) => {
+      //       Object.keys(itemGameInput).map((key) => {
+      //         if (gameInput[key] != itemGameInput[key]) {
+      //           return false;
+      //         }
+      //       });
+      //       return true;
+      //     })?.id || null,
+      // );
+
+      // result = result.filter((resultItem) => resultItem);
+
+      result = order?.orderGameInputs?.map((itemGameInput) => itemGameInput.id);
+      if (result?.length == orderGameInputData?.length) {
+        return result;
+      }
+    }
+  }
+  return false;
 };
 
 const getPaymentUrlLava = async ({ typePayment, amount, userId, orderId }) => {

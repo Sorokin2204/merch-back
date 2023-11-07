@@ -47,8 +47,8 @@ const setupRelationship = (db) => {
   db.package.hasMany(db.orderPackage);
   db.orderPackage.belongsTo(db.package);
 
-  db.order.hasMany(db.orderGameInput);
-  db.orderGameInput.belongsTo(db.order);
+  // db.order.hasMany(db.orderGameInput);
+  // db.orderGameInput.belongsTo(db.order);
 
   db.gameInput.hasMany(db.orderGameInput);
   db.orderGameInput.belongsTo(db.gameInput);
@@ -67,6 +67,9 @@ const setupRelationship = (db) => {
 
   db.comment.hasMany(db.transaction);
   db.transaction.belongsTo(db.comment);
+
+  db.order.belongsToMany(db.orderGameInput, { through: { model: db.orderGameInputRelation, unique: false }, foreignKey: 'orderId' });
+  db.orderGameInput.belongsToMany(db.order, { through: { model: db.orderGameInputRelation, unique: false }, foreignKey: 'orderGameInputId' });
 };
 
 module.exports = setupRelationship;

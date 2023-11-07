@@ -16,5 +16,6 @@ router.get('/single/:id', errorWrapper(auth), errorWrapper(orderController.getOr
 router.get('/save-game-inputs', errorWrapper(auth), errorWrapper(orderController.getSaveGameInputs));
 router.post('/save-game-input', errorWrapper(auth), errorWrapper(orderController.removeSaveGameInput));
 router.post('/change-payment', errorWrapper(auth), errorWrapper(orderController.changeTypePaymentOrder));
-router.get('/pay', errorWrapper(orderController.testCreatePayment));
+// router.get('/test', errorWrapper(orderController.test));
+
 module.exports = router;

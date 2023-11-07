@@ -107,8 +107,9 @@ class GameController {
       let findGame = await Game.findOne({
         where: {
           [propName]: slug,
-          ...(findParentBySlug && parentSlug && { parentGameId: findParentBySlug.id }),
+          ...(findParentBySlug && parentSlug ? { parentGameId: findParentBySlug.id } : { parentGameId: null }),
         },
+        order: [[GameInput, 'order', 'ASC']],
         include: [
           { model: Package, where: { deleted: false }, order: [['order', 'DESC']], required: false },
           { model: GameInput, include: { model: GameInputOption } },

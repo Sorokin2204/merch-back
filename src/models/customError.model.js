@@ -9,6 +9,7 @@ const TypeError = {
   LOGIN_ERROR: 'LOGIN_ERROR',
   NOT_FOUND: 'NOT_FOUND',
   COMMENT_EXIST: 'COMMENT_EXIST',
+  PARSER_COND: 'Ошибка! Использовать надо или [in] или [notIn]',
 };
 
 class CustomError {

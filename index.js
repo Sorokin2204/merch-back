@@ -19,6 +19,8 @@ const { CustomError, TypeError } = require('./src/models/customError.model');
 const fileUpload = require('express-fileupload');
 require('dotenv').config();
 
+const cron = require('node-cron');
+
 var corsOptions = {
   origin: '*',
 };
@@ -47,6 +49,10 @@ app.use('/api/banner', bannerRouter);
 app.use('/api/order', orderRouter);
 app.use('/api/comment', commentRouter);
 app.use('/api', otherRouter);
+
+cron.schedule('0 0 */2 * * *', async () => {
+  // await db.order
+});
 
 app.use(function (req, res, next) {
   throw new CustomError(404, TypeError.PATH_NOT_FOUND);

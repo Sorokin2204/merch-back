@@ -39,7 +39,22 @@ class OtherController {
   }
 
   async startParser(req, res) {
+    let inCond;
+    let notInCond;
+    if (req.query.in && req.query.notIn) {
+      throw new CustomError(400, TypeError.PARSER_COND);
+    }
+    if (req.query.in) {
+      inCond = req.query.in.split(',');
+    } else if (req.query.notIn) {
+      notInCond = req.query.notIn.split(',');
+    }
+
     const gameList = await Game.findAll({
+      where: {
+        ...(inCond && { id: { [Op.in]: inCond } }),
+        ...(notInCond && { id: { [Op.notIn]: notInCond } }),
+      },
       include: [{ model: ParentGame }],
     });
     for (let game of gameList) {
@@ -55,7 +70,7 @@ class OtherController {
         });
         if (findPack) {
           await Package.update(
-            { name, price, discountPrice: priceDiscount, disabled, order: orderPack },
+            { price, discountPrice: priceDiscount, disabled },
             {
               where: {
                 id: findPack.id,

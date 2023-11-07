@@ -42,6 +42,7 @@ db.typePayment = require('./typePayment.model')(sequelize, Sequelize);
 db.order = require('./order.model')(sequelize, Sequelize);
 db.orderPackage = require('./orderPackage.model')(sequelize, Sequelize);
 db.orderGameInput = require('./orderGameInput.model')(sequelize, Sequelize);
+db.orderGameInputRelation = require('./orderGameInputRelation.model')(sequelize, Sequelize);
 db.comment = require('./comment.model')(sequelize, Sequelize);
 db.transaction = require('./transaction.model')(sequelize, Sequelize);
 
