@@ -26,36 +26,40 @@ const ParentGame = db.parentGame;
 
 class OrderController {
   async createOrder(req, res) {
-    const { gameId, typePaymentId = null, packageList, gameInputList } = req.body;
-    const orderData = {
-      status: 'wait',
-      userId: res.locals.userData.id,
-      gameId,
-      ...(typePaymentId && { typePaymentId }),
-    };
-    const createOrder = await Order.create(orderData);
+    try {
+      const { gameId, typePaymentId = null, packageList, gameInputList } = req.body;
+      const orderData = {
+        status: 'wait',
+        userId: res.locals.userData.id,
+        gameId,
+        ...(typePaymentId && { typePaymentId }),
+      };
+      const createOrder = await Order.create(orderData);
 
-    const orderPackageData = packageList?.map((pack) => ({ status: 'wait', orderId: createOrder?.id, packageId: pack }));
+      const orderPackageData = packageList?.map((pack) => ({ status: 'wait', orderId: createOrder?.id, packageId: pack }));
 
-    await OrderPackage.bulkCreate(orderPackageData);
+      await OrderPackage.bulkCreate(orderPackageData);
 
-    if (gameInputList?.length !== 0) {
-      let orderGameInputData = gameInputList?.map((gameInput) => ({ gameInputId: gameInput.gameInputId, ...(gameInput?.type == 'select' ? { gameInputOptionId: gameInput.value, value: null } : { value: gameInput.value }) }));
-      console.log(orderGameInputData);
-      let existGameInputs = await findExistGameInputs({ orderGameInputData, userId: res.locals.userData.id, gameId });
-      console.log(existGameInputs);
-      if (existGameInputs) {
-        existGameInputs = existGameInputs?.map((existGameInputId) => ({ orderGameInputId: existGameInputId, orderId: createOrder?.id }));
+      if (gameInputList?.length !== 0) {
+        let orderGameInputData = gameInputList?.map((gameInput) => ({ gameInputId: gameInput.gameInputId, ...(gameInput?.type == 'select' ? { gameInputOptionId: gameInput.value, value: null } : { value: gameInput.value }) }));
+        console.log(orderGameInputData);
+        let existGameInputs = await findExistGameInputs({ orderGameInputData, userId: res.locals.userData.id, gameId });
         console.log(existGameInputs);
-        await OrderGameInputRelation.bulkCreate(existGameInputs);
-      } else {
-        for (let orderGameInput of orderGameInputData) {
-          const createOrderGameInput = await OrderGameInput.create(orderGameInput);
-          await OrderGameInputRelation.create({ orderGameInputId: createOrderGameInput.id, orderId: createOrder?.id });
+        if (existGameInputs) {
+          existGameInputs = existGameInputs?.map((existGameInputId) => ({ orderGameInputId: existGameInputId, orderId: createOrder?.id }));
+          console.log(existGameInputs);
+          await OrderGameInputRelation.bulkCreate(existGameInputs);
+        } else {
+          for (let orderGameInput of orderGameInputData) {
+            const createOrderGameInput = await OrderGameInput.create(orderGameInput);
+            await OrderGameInputRelation.create({ orderGameInputId: createOrderGameInput.id, orderId: createOrder?.id });
+          }
         }
       }
+      res.json({ orderId: createOrder.id });
+    } catch (error) {
+      console.log(error);
     }
-    res.json({ orderId: createOrder.id });
   }
 
   // async test(req, res) {
@@ -165,7 +169,7 @@ class OrderController {
       include: [
         {
           model: Order,
-          where: { userId: res.locals.userData.id, saveGameInputs: true, status: { [Op.not]: 'wait' } },
+          where: { userId: res.locals.userData.id, saveGameInputs: true, status: { [Op.notIn]: ['wait', 'expired'] } },
           include: [{ model: OrderGameInput, include: [{ model: GameInput }, { model: GameInputOption }] }],
           attributes: ['id'],
         },
@@ -236,7 +240,7 @@ class OrderController {
   async getOrderList(req, res) {
     const findOrderList = await Order.findAll({
       order: [['createdAt', 'DESC']],
-      where: { userId: res.locals.userData.id },
+      where: { userId: res.locals.userData.id, status: { [Op.not]: 'expired' } },
       include: [
         { model: Game, attribute: ['preview'] },
         { model: OrderPackage, include: Package },
@@ -248,7 +252,7 @@ class OrderController {
   async getOrderListAdmin(req, res) {
     const findOrderList = await Order.findAll({
       order: [['createdAt', 'DESC']],
-      where: { status: { [Op.or]: ['success', 'paid', 'incorrect', 'not-available'] } },
+      where: { status: { [Op.or]: ['success', 'paid', 'incorrect', 'not-available', 'return'] } },
       include: [{ model: Game, attribute: ['preview', 'name'] }, { model: OrderPackage, include: Package }, { model: OrderGameInput, include: [{ model: GameInput }, { model: GameInputOption }] }, { model: TypePayment }, { model: User }],
     });
     res.json(findOrderList);
@@ -332,25 +336,27 @@ const findExistGameInputs = async ({ gameId, userId, orderGameInputData }) => {
     ],
     attributes: ['id'],
   });
-  for (let order of findAllOrderGameInputs.orders) {
-    if (order?.orderGameInputs?.length == orderGameInputData?.length) {
-      // result = orderGameInputData?.map(
-      //   (itemGameInput) =>
-      //     order?.orderGameInputs?.find((gameInput) => {
-      //       Object.keys(itemGameInput).map((key) => {
-      //         if (gameInput[key] != itemGameInput[key]) {
-      //           return false;
-      //         }
-      //       });
-      //       return true;
-      //     })?.id || null,
-      // );
+  if (findAllOrderGameInputs?.orders) {
+    for (let order of findAllOrderGameInputs.orders) {
+      if (order?.orderGameInputs?.length == orderGameInputData?.length) {
+        // result = orderGameInputData?.map(
+        //   (itemGameInput) =>
+        //     order?.orderGameInputs?.find((gameInput) => {
+        //       Object.keys(itemGameInput).map((key) => {
+        //         if (gameInput[key] != itemGameInput[key]) {
+        //           return false;
+        //         }
+        //       });
+        //       return true;
+        //     })?.id || null,
+        // );
 
-      // result = result.filter((resultItem) => resultItem);
+        // result = result.filter((resultItem) => resultItem);
 
-      result = order?.orderGameInputs?.map((itemGameInput) => itemGameInput.id);
-      if (result?.length == orderGameInputData?.length) {
-        return result;
+        result = order?.orderGameInputs?.map((itemGameInput) => itemGameInput.id);
+        if (result?.length == orderGameInputData?.length) {
+          return result;
+        }
       }
     }
   }

@@ -121,7 +121,7 @@ class OtherController {
       const customFields = req.body.custom_fields.split('=');
 
       if (customFields[0] == 'userId') {
-        await topUpBalanceUser({ userId: customFields[1], amount: body.amount });
+        await topUpBalanceUser({ userId: customFields[1], amount: req.body.amount });
         res.json('OK');
       } else if (customFields[0] == 'orderId') {
         await paymentOrderUser({ orderId: customFields[1] });

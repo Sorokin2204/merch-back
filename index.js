@@ -4,6 +4,7 @@ const axios = require('axios');
 const app = express();
 const db = require('./src/models');
 const bodyParser = require('body-parser');
+const moment = require('moment');
 const userRouter = require('./src/routes/user.routes');
 const gameRouter = require('./src/routes/game.routes');
 const otherRouter = require('./src/routes/other.routes');
@@ -20,6 +21,7 @@ const fileUpload = require('express-fileupload');
 require('dotenv').config();
 
 const cron = require('node-cron');
+const { Op } = require('sequelize');
 
 var corsOptions = {
   origin: '*',
@@ -50,8 +52,19 @@ app.use('/api/order', orderRouter);
 app.use('/api/comment', commentRouter);
 app.use('/api', otherRouter);
 
-cron.schedule('0 0 */2 * * *', async () => {
-  // await db.order
+cron.schedule('0 */2 * * * *', async () => {
+  try {
+    await db.order.update(
+      {
+        status: 'expired',
+      },
+      {
+        where: { status: 'wait', createdAt: { [Op.lt]: moment().subtract(1, 'd').toDate() } },
+      },
+    );
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 app.use(function (req, res, next) {

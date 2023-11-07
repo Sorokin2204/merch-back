@@ -109,9 +109,12 @@ class GameController {
           [propName]: slug,
           ...(findParentBySlug && parentSlug ? { parentGameId: findParentBySlug.id } : { parentGameId: null }),
         },
-        order: [[GameInput, 'order', 'ASC']],
+        order: [
+          [GameInput, 'order', 'ASC'],
+          [Package, 'order', 'DESC'],
+        ],
         include: [
-          { model: Package, where: { deleted: false }, order: [['order', 'DESC']], required: false },
+          { model: Package, where: { deleted: false }, required: false },
           { model: GameInput, include: { model: GameInputOption } },
           { model: ParentGame, attributes: ['slug', 'name'] },
           { model: Order, attributes: ['id'], include: [{ model: Comment, where: { moderate: true }, required: false, attributes: ['like'] }] },
