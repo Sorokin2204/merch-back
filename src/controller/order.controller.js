@@ -26,52 +26,54 @@ const ParentGame = db.parentGame;
 
 class OrderController {
   async createOrder(req, res) {
-    try {
-      const { gameId, typePaymentId = null, packageList, gameInputList } = req.body;
-      const orderData = {
-        status: 'wait',
-        userId: res.locals.userData.id,
-        gameId,
-        ...(typePaymentId && { typePaymentId }),
-      };
-      const createOrder = await Order.create(orderData);
+    const { gameId, typePaymentId = null, packageList, gameInputList } = req.body;
+    const createOrderId = await this.getCreatedOrderId({ gameId, typePaymentId, packageList, gameInputList, userId: res.locals.userData.id });
+    res.json({ orderId: createOrderId });
+  }
+  async getCreatedOrderId({ gameId, typePaymentId = null, packageList, gameInputList, userId }) {
+    const orderData = {
+      status: 'wait',
+      userId,
+      gameId,
+      ...(typePaymentId && { typePaymentId }),
+    };
+    const createOrder = await Order.create(orderData);
 
-      const orderPackageData = packageList?.map((pack) => ({ status: 'wait', orderId: createOrder?.id, packageId: pack }));
+    const orderPackageData = packageList?.map((pack) => ({ status: 'wait', orderId: createOrder?.id, packageId: pack }));
 
-      await OrderPackage.bulkCreate(orderPackageData);
+    await OrderPackage.bulkCreate(orderPackageData);
 
-      if (gameInputList?.length !== 0) {
-        let orderGameInputData = gameInputList?.map((gameInput) => ({ gameInputId: gameInput.gameInputId, ...(gameInput?.type == 'select' ? { gameInputOptionId: gameInput.value, value: null } : { value: gameInput.value }) }));
-        console.log(orderGameInputData);
-        let existGameInputs = await findExistGameInputs({ orderGameInputData, userId: res.locals.userData.id, gameId });
+    if (gameInputList?.length !== 0) {
+      let orderGameInputData = gameInputList?.map((gameInput) => ({ gameInputId: gameInput.gameInputId, ...(gameInput?.type == 'select' ? { gameInputOptionId: gameInput.value, value: null } : { value: gameInput.value }) }));
+      console.log(orderGameInputData);
+      let existGameInputs = await findExistGameInputs({ orderGameInputData, userId, gameId });
+      console.log(existGameInputs);
+      if (existGameInputs) {
+        existGameInputs = existGameInputs?.map((existGameInputId) => ({ orderGameInputId: existGameInputId, orderId: createOrder?.id }));
         console.log(existGameInputs);
-        if (existGameInputs) {
-          existGameInputs = existGameInputs?.map((existGameInputId) => ({ orderGameInputId: existGameInputId, orderId: createOrder?.id }));
-          console.log(existGameInputs);
-          await OrderGameInputRelation.bulkCreate(existGameInputs);
-        } else {
-          for (let orderGameInput of orderGameInputData) {
-            const createOrderGameInput = await OrderGameInput.create(orderGameInput);
-            await OrderGameInputRelation.create({ orderGameInputId: createOrderGameInput.id, orderId: createOrder?.id });
-          }
+        await OrderGameInputRelation.bulkCreate(existGameInputs);
+      } else {
+        for (let orderGameInput of orderGameInputData) {
+          const createOrderGameInput = await OrderGameInput.create(orderGameInput);
+          await OrderGameInputRelation.create({ orderGameInputId: createOrderGameInput.id, orderId: createOrder?.id });
         }
       }
-      res.json({ orderId: createOrder.id });
-    } catch (error) {
-      console.log(error);
     }
   }
-
   // async test(req, res) {
-  //   let data = await findExistGameInputs({
-  //     userId: 1,
-  //     gameId: 11,
-  //     orderGameInputData: [
-  //       { gameInputId: 2, gameInputOptionId: '1', value: null },
-  //       { gameInputId: 1, value: '34534543534' },
-  //     ],
-  //   });
-  //   res.json(data);
+  //   try {
+  //     const res2 = await axios.get('https://api.unisender.com/ru/api/getLists?format=json&api_key=6cc1citgcmb69bys7drtgj913fdtwqi5dzoue4fa');
+  //     console.log(res2.data);
+  //     // const response = await axios.get(
+  //     //   encodeURI(
+  //     //     `https://api.unisender.com/ru/api/sendEmail?format=json&api_key=6cc1citgcmb69bys7drtgj913fdtwqi5dzoue4fa&email=daniil.sorokin.228@gmail.com&sender_name=Donat.store&sender_email=Hi.donatstore@gmail.com&subject=Ссылкадлявхода&body=<div>Hello test message unisender</div>&lang=ru&list_id=1`,
+  //     //   ),
+  //     // );
+  //     // console.log(response.data);
+  //     res.json(true);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
   // }
 
   async createPayment(req, res) {

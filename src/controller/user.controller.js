@@ -11,6 +11,7 @@ const { currencyFormat } = require('../utils/currencyFormat');
 const randomIntFromInterval = require('../utils/randomIntFromInterval');
 const mailService = require('../utils/mainSend');
 
+const orderController = require('../controller/order.controller');
 const User = db.user;
 const Image = db.image;
 const Advert = db.advert;
@@ -119,11 +120,22 @@ class PageController {
     }
 
     const tokenPassword = jwt.sign({ id: userId, email: userEmail }, process.env.SECRET_TOKEN_PASSWORD, { expiresIn: '1d' });
-    await mailService.sendMailPassword(email, `${process.env.DOMAIN}/do?e=${email}&s=${tokenPassword}`);
+
+    try {
+      const resp2 = await axios.get(
+        encodeURI(
+          `https://api.unisender.com/ru/api/sendEmail?format=json&api_key=6cc1citgcmb69bys7drtgj913fdtwqi5dzoue4fa&email=${email}&sender_name=Donat.store&sender_email=Hi.donatstore@gmail.com&subject=Ссылка для входа в аккаунт Donat.store&body=<div><h1>Перейдите по ссылке для входа в аккаунт</h1><a href="${process.env.DOMAIN}/do?e=${email}%26s=${tokenPassword}">Ваша ссылка для входа</a><p><b>Donat.Store</b> - ваш выгодный донат в мобильные игры</p></div>&lang=ru&list_id=1`,
+        ),
+      );
+      console.log(resp2.data);
+    } catch (error) {
+      console.log(error);
+    }
+    // await mailService.sendMailPassword(email, `${process.env.DOMAIN}/do?e=${email}&s=${tokenPassword}`);
     const tokenOrder = jwt.sign({ id: userId, email: userEmail }, process.env.SECRET_TOKEN, { expiresIn: '1m' });
     if (order) {
       try {
-        await axios.post(`${process.env.DOMAIN}/api/order/create`, order, { headers: { 'auth-token': tokenOrder } });
+        await orderController.getCreatedOrderId({ ...order, userId });
       } catch (error) {
         console.log(error);
         throw new CustomError();
