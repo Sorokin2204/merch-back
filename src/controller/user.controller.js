@@ -122,11 +122,20 @@ class PageController {
     const tokenPassword = jwt.sign({ id: userId, email: userEmail }, process.env.SECRET_TOKEN_PASSWORD, { expiresIn: '1d' });
 
     try {
-      const resp2 = await axios.get(
-        encodeURI(
-          `https://api.unisender.com/ru/api/sendEmail?format=json&api_key=6cc1citgcmb69bys7drtgj913fdtwqi5dzoue4fa&email=${email}&sender_name=Donat.store&sender_email=Hi.donatstore@gmail.com&subject=Ссылка для входа в аккаунт Donat.store&body=<div><h1>Перейдите по ссылке для входа в аккаунт</h1><a href="${process.env.DOMAIN}/do?e=${email}%26s=${tokenPassword}">Ваша ссылка для входа</a><p><b>Donat.Store</b> - ваш выгодный донат в мобильные игры</p></div>&lang=ru&list_id=1`,
-        ),
-      );
+      // ?format=json&api_key=6cc1citgcmb69bys7drtgj913fdtwqi5dzoue4fa&email=${email}&sender_name=Donat.store&sender_email=Hi.donatstore@gmail.com&subject=Ссылка для входа в аккаунт Donat.store&body=<div><h1>Перейдите по ссылке для входа в аккаунт</h1><a href="${process.env.DOMAIN}/do?e=${email}%26s=${tokenPassword}">Ваша ссылка для входа</a><p><b>Donat.Store</b> - ваш выгодный донат в мобильные игры</p></div>&lang=ru&list_id=1
+      const resp2 = await axios.get(`https://api.unisender.com/ru/api/sendEmail`, {
+        params: {
+          format: 'json',
+          api_key: '6cc1citgcmb69bys7drtgj913fdtwqi5dzoue4fa',
+          email,
+          sender_name: 'Donat.store',
+          sender_email: 'hi.donatstore@gmail.com',
+          subject: 'Ссылка для входа в аккаунт Donat.store',
+          body: `<div><h1>Перейдите по ссылке для входа в аккаунт</h1><a href="${process.env.DOMAIN}/do?e=${email}&s=${tokenPassword}">Ваша ссылка для входа</a><p><b>Donat.Store</b> - ваш выгодный донат в мобильные игры</p></div>`,
+          lang: 'ru',
+          list_id: 1,
+        },
+      });
       console.log(resp2.data);
     } catch (error) {
       console.log(error);
