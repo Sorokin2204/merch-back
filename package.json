@@ -32,7 +32,6 @@
     "node-cron": "^3.0.2",
     "nodemailer": "^6.8.0",
     "nodemon": "^2.0.16",
-    "puppeteer": "^21.2.1",
     "request-promise-native": "^1.0.9",
     "sequelize": "^6.19.0",
     "sequelize-hierarchy": "^2.0.4",

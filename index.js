@@ -5,14 +5,7 @@ const app = express();
 const db = require('./src/models');
 const bodyParser = require('body-parser');
 const moment = require('moment');
-const userRouter = require('./src/routes/user.routes');
-const gameRouter = require('./src/routes/game.routes');
-const otherRouter = require('./src/routes/other.routes');
-const orderRouter = require('./src/routes/order.routes');
-const parentGameRouter = require('./src/routes/parentGame.routes');
-const supportRouter = require('./src/routes/support.routes');
-const commentRouter = require('./src/routes/comment.routes');
-const bannerRouter = require('./src/routes/banner.routes');
+const mainRouter = require('./src/routes/main.routes');
 
 const reset = require('./src/setup');
 const { handleError } = require('./src/middleware/customError');
@@ -43,29 +36,7 @@ db.sequelize.sync({ alter: true }).then((se) => {
   reset(db);
 });
 
-app.use('/api', userRouter);
-app.use('/api/game', gameRouter);
-app.use('/api/parent-game', parentGameRouter);
-app.use('/api/support', supportRouter);
-app.use('/api/banner', bannerRouter);
-app.use('/api/order', orderRouter);
-app.use('/api/comment', commentRouter);
-app.use('/api', otherRouter);
-
-cron.schedule('0 */2 * * * *', async () => {
-  try {
-    await db.order.update(
-      {
-        status: 'expired',
-      },
-      {
-        where: { status: 'wait', createdAt: { [Op.lt]: moment().subtract(1, 'd').toDate() } },
-      },
-    );
-  } catch (error) {
-    console.log(error);
-  }
-});
+app.use('/api', mainRouter);
 
 app.use(function (req, res, next) {
   throw new CustomError(404, TypeError.PATH_NOT_FOUND);
