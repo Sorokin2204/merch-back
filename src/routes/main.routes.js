@@ -10,5 +10,5 @@ router.get('/post/country-list', errorWrapper(mainController.getPostCountryList)
 router.get('/post/find-addresses', errorWrapper(mainController.findPostAddresses));
 router.post('/post/calculate-cost', errorWrapper(mainController.calculatePostCost));
 router.get('/review/list', errorWrapper(mainController.getProductReviews));
-
+router.post('/process-payment', errorWrapper(mainController.processPayment));
 module.exports = router;

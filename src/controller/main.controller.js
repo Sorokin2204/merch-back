@@ -76,7 +76,9 @@ class MainController {
     }
     res.json(response.data);
   }
-
+  async processPayment(req, res) {
+    res.send('OK');
+  }
   async getProductReviews(req, res) {
     const { productId } = req.query;
     const findReviews = await Review.findAll({ where: { productId } });
